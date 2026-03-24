@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "简天气主模块"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "天气查询与展示"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
+      "value": "天气"
     },
     {
       "name": "Location_Reason",

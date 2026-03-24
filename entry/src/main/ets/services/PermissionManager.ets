@@ -1,4 +1,4 @@
-import { abilityAccessCtrl, bundleManager, common, Permissions } from '@kit.AbilityKit';
+import { abilityAccessCtrl, bundleManager, common, Permissions, Want } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 
 export async function checkPermissionGrant(permission: Permissions): Promise<abilityAccessCtrl.GrantStatus> {
@@ -28,23 +28,56 @@ export async function checkPermissionGrant(permission: Permissions): Promise<abi
   return grantStatus;
 }
 
-export function reqPermissionsFromUser(permissions: Array<Permissions>, context: common.UIAbilityContext): void {
-  let atManager: abilityAccessCtrl.AtManager = abilityAccessCtrl.createAtManager();
-  // requestPermissionsFromUser会判断权限的授权状态来决定是否唤起弹窗。
-  atManager.requestPermissionsFromUser(context, permissions).then((data) => {
-    let grantStatus: number[] = data.authResults;
-    let length: number = grantStatus.length;
-    for (let i = 0; i < length; i++) {
-      if (grantStatus[i] === 0) {
-        // 用户授权，可以继续访问目标操作。
-        console.info(`${permissions[i]} is granted by user.`);
-      } else {
-        // 用户拒绝授权，提示用户必须授权才能访问当前页面的功能，并引导用户到系统设置中打开相应的权限。
-        return;
+/**
+ * 申请用户授权。authResults 全为 0 表示全部授予。
+ */
+export async function requestPermissionsFromUserAsync(
+  permissions: Array<Permissions>,
+  context: common.UIAbilityContext
+): Promise<boolean> {
+  const atManager: abilityAccessCtrl.AtManager = abilityAccessCtrl.createAtManager();
+  try {
+    const data = await atManager.requestPermissionsFromUser(context, permissions);
+    const grantStatus: number[] = data.authResults;
+    for (let i = 0; i < grantStatus.length; i++) {
+      if (grantStatus[i] !== 0) {
+        return false;
       }
     }
-    // 授权成功。
-  }).catch((err: BusinessError) => {
+    return true;
+  } catch (error) {
+    const err: BusinessError = error as BusinessError;
     console.error(`Failed to request permissions from user, code: ${err.code}, message: ${err.message}`);
-  })
+    return false;
+  }
+}
+
+/**
+ * 跳转系统设置中本应用详情页，便于用户手动打开权限。
+ */
+export async function openApplicationPermissionSettings(context: common.UIAbilityContext): Promise<void> {
+  let bundleName = '';
+  try {
+    const bundleInfo: bundleManager.BundleInfo =
+      await bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION);
+    bundleName = bundleInfo.name;
+  } catch (error) {
+    const err: BusinessError = error as BusinessError;
+    console.error(`getBundleInfoForSelf failed, code: ${err.code}, message: ${err.message}`);
+    return;
+  }
+  const parameters: Record<string, Object> = {};
+  parameters['pushParams'] = bundleName;
+  const want: Want = {
+    bundleName: 'com.huawei.hmos.settings',
+    abilityName: 'com.huawei.hmos.settings.MainAbility',
+    uri: 'application_info_entry',
+    parameters
+  };
+  try {
+    await context.startAbility(want);
+  } catch (error) {
+    const err: BusinessError = error as BusinessError;
+    console.error(`Failed to open app settings, code: ${err.code}, message: ${err.message}`);
+  }
 }
